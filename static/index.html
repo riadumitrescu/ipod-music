@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Playlist Downloader</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>YouTube Playlist Downloader</h1>
+            <p class="subtitle">Paste a playlist, channel, or video URL to get started</p>
+        </header>
+
+        <!-- Input Section -->
+        <section id="input-section">
+            <div class="input-group">
+                <input type="text" id="url-input"
+                       placeholder="https://www.youtube.com/playlist?list=..."
+                       autocomplete="off"
+                       spellcheck="false">
+                <button id="extract-btn">Extract Videos</button>
+            </div>
+            <div id="error-message" class="error hidden"></div>
+        </section>
+
+        <!-- Loading Section -->
+        <section id="loading-section" class="hidden">
+            <div class="spinner"></div>
+            <p class="loading-text">Extracting playlist information...</p>
+        </section>
+
+        <!-- Results Section -->
+        <section id="results-section" class="hidden">
+            <div class="results-header">
+                <div class="results-info">
+                    <h2 id="playlist-title"></h2>
+                    <span id="video-count" class="badge"></span>
+                </div>
+                <div class="actions">
+                    <div class="format-toggle">
+                        <button class="format-btn active" data-format="mp3">MP3</button>
+                        <button class="format-btn" data-format="mp4">MP4</button>
+                    </div>
+                    <button id="new-playlist-btn" class="btn-ghost">New Playlist</button>
+                    <button id="select-all-btn" class="btn-secondary">Deselect All</button>
+                    <button id="download-selected-btn" class="btn-primary">Download Selected</button>
+                </div>
+            </div>
+            <div id="video-grid" class="video-grid"></div>
+
+            <!-- Big ZIP download section (appears after downloads complete) -->
+            <div id="zip-section" class="zip-section hidden">
+                <div class="zip-section-inner">
+                    <div class="zip-icon">&#128230;</div>
+                    <div class="zip-info">
+                        <span id="zip-title" class="zip-title">Download All as ZIP</span>
+                        <span id="zip-subtitle" class="zip-subtitle">0 videos ready</span>
+                    </div>
+                    <button id="download-zip-btn" class="btn-zip">Download ZIP</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Download Progress Bar (sticky at bottom) -->
+        <div id="download-bar" class="download-bar hidden">
+            <div class="download-bar-content">
+                <div class="download-bar-info">
+                    <span id="download-status">Downloading...</span>
+                    <span id="download-overall-progress">0 / 0</span>
+                </div>
+                <div class="progress-bar-track">
+                    <div id="overall-progress-fill" class="progress-bar-fill"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>YouTube Playlist Downloader</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
     <div class="container">
@@ -49,18 +49,6 @@
                 </div>
             </div>
             <div id="video-grid" class="video-grid"></div>
-
-            <!-- Big ZIP download section (appears after downloads complete) -->
-            <div id="zip-section" class="zip-section hidden">
-                <div class="zip-section-inner">
-                    <div class="zip-icon">&#128230;</div>
-                    <div class="zip-info">
-                        <span id="zip-title" class="zip-title">Download All as ZIP</span>
-                        <span id="zip-subtitle" class="zip-subtitle">0 videos ready</span>
-                    </div>
-                    <button id="download-zip-btn" class="btn-zip">Download ZIP</button>
-                </div>
-            </div>
         </section>
 
         <!-- Download Progress Bar (sticky at bottom) -->
@@ -77,6 +65,6 @@
         </div>
     </div>
 
-    <script src="/static/app.js"></script>
+    <script src="/app.js"></script>
 </body>
 </html>

@@ -1,12 +1,11 @@
 // === State ===
-let sessionId = null;
-let playlistTitle = "";
 let videos = [];
 let selectedIds = new Set();
 let downloadedIds = new Set();
 let errorIds = new Set();
 let allSelected = true;
-let selectedFormat = "mp3"; // "mp3" or "mp4"
+let selectedFormat = "mp3";
+let isDownloading = false;
 
 // === DOM Refs ===
 const urlInput = document.getElementById("url-input");
@@ -24,10 +23,7 @@ const downloadBar = document.getElementById("download-bar");
 const downloadStatus = document.getElementById("download-status");
 const overallProgress = document.getElementById("download-overall-progress");
 const overallProgressFill = document.getElementById("overall-progress-fill");
-const downloadZipBtn = document.getElementById("download-zip-btn");
 const newPlaylistBtn = document.getElementById("new-playlist-btn");
-const zipSection = document.getElementById("zip-section");
-const zipSubtitle = document.getElementById("zip-subtitle");
 
 // === Section Management ===
 function showSection(name) {
@@ -79,13 +75,14 @@ async function extractPlaylist() {
     }
 
     const data = await res.json();
-    sessionId = data.session_id;
-    playlistTitle = data.title;
     videos = data.videos;
     selectedIds = new Set(videos.map((v) => v.video_id));
     downloadedIds = new Set();
     errorIds = new Set();
     allSelected = true;
+
+    playlistTitleEl.textContent = data.title;
+    videoCountEl.textContent = `${videos.length} video${videos.length !== 1 ? "s" : ""}`;
 
     renderVideoGrid();
     showSection("results");
@@ -99,10 +96,7 @@ async function extractPlaylist() {
 
 // === Render Video Grid ===
 function renderVideoGrid() {
-  playlistTitleEl.textContent = playlistTitle;
-  videoCountEl.textContent = `${videos.length} video${videos.length !== 1 ? "s" : ""}`;
   videoGrid.innerHTML = "";
-  zipSection.classList.add("hidden");
 
   videos.forEach((video) => {
     const card = document.createElement("div");
@@ -132,18 +126,10 @@ function renderVideoGrid() {
       <div class="error-msg"></div>
     `;
 
-    // Toggle selection on click
     card.addEventListener("click", (e) => {
       if (e.target.closest(".status-icon")) return;
+      if (isDownloading) return;
       toggleSelection(video.video_id, card);
-    });
-
-    // Status icon click: download individual file if complete
-    card.querySelector(".status-icon").addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (card.classList.contains("complete")) {
-        window.open(`/api/file/${sessionId}/${video.video_id}`, "_blank");
-      }
     });
 
     videoGrid.appendChild(card);
@@ -167,11 +153,12 @@ function toggleSelection(videoId, card) {
 function updateSelectionUI() {
   selectAllBtn.textContent = allSelected ? "Deselect All" : "Select All";
   downloadSelectedBtn.textContent = `Download Selected (${selectedIds.size})`;
-  downloadSelectedBtn.disabled = selectedIds.size === 0;
+  downloadSelectedBtn.disabled = selectedIds.size === 0 || isDownloading;
 }
 
 // === Select / Deselect All ===
 selectAllBtn.addEventListener("click", () => {
+  if (isDownloading) return;
   allSelected = !allSelected;
   const cards = videoGrid.querySelectorAll(".video-card");
   cards.forEach((card) => {
@@ -189,42 +176,38 @@ selectAllBtn.addEventListener("click", () => {
 
 // === New Playlist ===
 newPlaylistBtn.addEventListener("click", () => {
-  if (sessionId) {
-    fetch(`/api/session/${sessionId}`, { method: "DELETE" }).catch(() => {});
-  }
-  sessionId = null;
+  if (isDownloading) return;
   videos = [];
   selectedIds.clear();
   downloadedIds.clear();
   errorIds.clear();
   urlInput.value = "";
   downloadBar.classList.add("hidden");
-  zipSection.classList.add("hidden");
   showSection("input");
 });
 
 // === Format Toggle ===
 document.querySelectorAll(".format-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
+    if (isDownloading) return;
     document.querySelectorAll(".format-btn").forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
     selectedFormat = btn.dataset.format;
   });
 });
 
-// === Download with SSE Progress ===
+// === Download Selected ===
 downloadSelectedBtn.addEventListener("click", () => {
-  if (selectedIds.size === 0) return;
-  startDownload([...selectedIds]);
+  if (selectedIds.size === 0 || isDownloading) return;
+  startDownloads([...selectedIds]);
 });
 
-function startDownload(videoIds) {
+async function startDownloads(videoIds) {
+  isDownloading = true;
   downloadSelectedBtn.disabled = true;
   selectAllBtn.disabled = true;
 
-  // Show download bar
   downloadBar.classList.remove("hidden");
-  zipSection.classList.add("hidden");
   downloadStatus.textContent = "Starting downloads...";
   overallProgress.textContent = `0 / ${videoIds.length}`;
   overallProgressFill.style.width = "0%";
@@ -234,84 +217,82 @@ function startDownload(videoIds) {
   let errorCount = 0;
   const totalCount = videoIds.length;
 
-  const idsParam = videoIds.join(",");
-  const evtSource = new EventSource(
-    `/api/download/${sessionId}?video_ids=${idsParam}&fmt=${selectedFormat}`
-  );
+  for (const videoId of videoIds) {
+    const video = videos.find((v) => v.video_id === videoId);
+    if (!video) continue;
 
-  evtSource.onmessage = (event) => {
-    const data = JSON.parse(event.data);
+    updateCardState(videoId, "downloading", "&#8595;");
+    downloadStatus.textContent = `Downloading: ${truncate(video.title, 40)}`;
 
-    switch (data.event_type) {
-      case "downloading":
-        updateCardState(data.video_id, "downloading", "&#8595;");
-        downloadStatus.textContent = `Downloading: ${truncate(data.title, 40)}`;
-        break;
+    try {
+      const res = await fetch("/api/download", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: video.url,
+          fmt: selectedFormat,
+          title: video.title,
+        }),
+      });
 
-      case "progress":
-        updateCardProgress(data.video_id, data.percent);
-        if (data.speed) {
-          downloadStatus.textContent = `Downloading... ${data.speed}`;
-        }
-        break;
+      if (!res.ok) {
+        let detail = "Download failed";
+        try {
+          const err = await res.json();
+          detail = err.detail || detail;
+        } catch (_) {}
+        throw new Error(detail);
+      }
 
-      case "merging":
-        updateCardState(data.video_id, "downloading", "&#8635;");
-        break;
+      const blob = await res.blob();
 
-      case "complete":
-        completedCount++;
-        downloadedIds.add(data.video_id);
-        updateCardState(data.video_id, "complete", "&#8595;");
-        updateCardProgress(data.video_id, 100);
-        overallProgress.textContent = `${completedCount} / ${totalCount}`;
-        overallProgressFill.style.width = `${((completedCount + errorCount) / totalCount) * 100}%`;
-        downloadStatus.textContent = `Downloaded: ${truncate(data.title, 40)}`;
-        break;
+      // Get filename from Content-Disposition header
+      const cd = res.headers.get("Content-Disposition");
+      let filename = `${video.title}.${selectedFormat}`;
+      if (cd) {
+        const match = cd.match(/filename="(.+)"/);
+        if (match) filename = match[1];
+      }
 
-      case "error":
-        errorCount++;
-        errorIds.add(data.video_id);
-        updateCardState(data.video_id, "error", "!");
-        setCardError(data.video_id, data.message || "Download failed");
-        overallProgress.textContent = `${completedCount} / ${totalCount}`;
-        overallProgressFill.style.width = `${((completedCount + errorCount) / totalCount) * 100}%`;
-        break;
+      // Trigger browser download
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
 
-      case "all_complete":
-        evtSource.close();
-        downloadSelectedBtn.disabled = false;
-        selectAllBtn.disabled = false;
-
-        // Build completion message
-        if (errorCount === 0) {
-          downloadStatus.textContent = `All ${completedCount} downloads complete!`;
-          overallProgressFill.classList.add("complete");
-        } else if (completedCount === 0) {
-          downloadStatus.textContent = `All ${errorCount} downloads failed`;
-        } else {
-          downloadStatus.textContent = `${completedCount} downloaded, ${errorCount} failed`;
-          overallProgressFill.classList.add("complete");
-        }
-
-        // Show big ZIP section if we have files
-        if (downloadedIds.size > 0) {
-          zipSubtitle.textContent = `${downloadedIds.size} video${downloadedIds.size !== 1 ? "s" : ""} ready to download`;
-          zipSection.classList.remove("hidden");
-          // Scroll to make it visible
-          zipSection.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        }
-        break;
+      completedCount++;
+      downloadedIds.add(videoId);
+      updateCardState(videoId, "complete", "&#10003;");
+      updateCardProgress(videoId, 100);
+      downloadStatus.textContent = `Downloaded: ${truncate(video.title, 40)}`;
+    } catch (e) {
+      errorCount++;
+      errorIds.add(videoId);
+      updateCardState(videoId, "error", "!");
+      setCardError(videoId, e.message || "Download failed");
     }
-  };
 
-  evtSource.onerror = () => {
-    evtSource.close();
-    downloadStatus.textContent =
-      "Connection lost. Refresh if downloads didn't complete.";
-    downloadSelectedBtn.disabled = false;
-    selectAllBtn.disabled = false;
-  };
+    overallProgress.textContent = `${completedCount + errorCount} / ${totalCount}`;
+    overallProgressFill.style.width = `${((completedCount + errorCount) / totalCount) * 100}%`;
+  }
+
+  // All done
+  isDownloading = false;
+  downloadSelectedBtn.disabled = false;
+  selectAllBtn.disabled = false;
+
+  if (errorCount === 0) {
+    downloadStatus.textContent = `All ${completedCount} downloads complete!`;
+    overallProgressFill.classList.add("complete");
+  } else if (completedCount === 0) {
+    downloadStatus.textContent = `All ${errorCount} downloads failed`;
+  } else {
+    downloadStatus.textContent = `${completedCount} downloaded, ${errorCount} failed`;
+    overallProgressFill.classList.add("complete");
+  }
 }
 
 // === Card Updates ===
@@ -341,11 +322,6 @@ function setCardError(videoId, message) {
     errorEl.textContent = message;
   }
 }
-
-// === ZIP Download ===
-downloadZipBtn.addEventListener("click", () => {
-  window.open(`/api/zip/${sessionId}`, "_blank");
-});
 
 // === Helpers ===
 function escapeHtml(text) {

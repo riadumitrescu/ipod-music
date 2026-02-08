@@ -382,7 +382,6 @@ header h1 {
     display: flex;
     background: var(--success);
     color: white;
-    cursor: pointer;
 }
 
 .video-card.error .status-icon {
@@ -479,79 +478,6 @@ header h1 {
 
 .progress-bar-fill.complete {
     background: var(--success);
-}
-
-/* --- ZIP Section (prominent, in-page) --- */
-.zip-section {
-    margin-top: 2rem;
-    margin-bottom: 1rem;
-}
-
-.zip-section-inner {
-    display: flex;
-    align-items: center;
-    gap: 1.25rem;
-    background: linear-gradient(135deg, #1a2745, #16213e);
-    border: 2px solid var(--success);
-    border-radius: var(--radius);
-    padding: 1.25rem 1.5rem;
-    animation: fadeInUp 0.4s ease;
-}
-
-.zip-icon {
-    font-size: 2.5rem;
-    line-height: 1;
-}
-
-.zip-info {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-}
-
-.zip-title {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-.zip-subtitle {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-}
-
-.btn-zip {
-    padding: 0.85rem 2rem;
-    background: var(--success);
-    color: #0f0f0f;
-    border: none;
-    border-radius: var(--radius-sm);
-    font-weight: 700;
-    font-size: 1rem;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: background 0.2s, transform 0.1s;
-}
-
-.btn-zip:hover {
-    background: #5fe6dc;
-    transform: scale(1.02);
-}
-
-.btn-zip:active {
-    transform: scale(0.98);
-}
-
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(12px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
 }
 
 /* --- Error tooltip on cards --- */

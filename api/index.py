@@ -39,6 +39,7 @@ class DownloadRequest(BaseModel):
     url: str
     fmt: str = "mp3"
     title: str = "video"
+    save_dir: Optional[str] = None
 
 
 # --- Helpers ---
@@ -102,6 +103,17 @@ async def download(req: DownloadRequest):
 
         safe_title = _safe_filename(req.title)
         ext = filepath.suffix
+
+        # Save directly to chosen folder if provided
+        if req.save_dir:
+            dest_dir = Path(req.save_dir).expanduser()
+            if not dest_dir.is_dir():
+                raise ValueError(f"Folder not found: {dest_dir}")
+            dest_path = dest_dir / f"{safe_title}{ext}"
+            shutil.copy2(filepath, dest_path)
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            return {"saved": str(dest_path)}
+
         media_type = "audio/mpeg" if ext == ".mp3" else "video/mp4"
 
         content = filepath.read_bytes()

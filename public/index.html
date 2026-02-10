@@ -11,6 +11,11 @@
         <header>
             <h1>YouTube Playlist Downloader</h1>
             <p class="subtitle">Paste a playlist, channel, or video URL to get started</p>
+            <div style="margin-top: 15px;">
+                <a href="/trending.html" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 10px 20px; border-radius: 20px; text-decoration: none; font-weight: 600; display: inline-block; transition: transform 0.2s ease;">
+                    📈 Discover Trending Videos
+                </a>
+            </div>
         </header>
 
         <!-- Input Section -->
@@ -42,6 +47,12 @@
                     <div class="format-toggle">
                         <button class="format-btn active" data-format="mp3">MP3</button>
                         <button class="format-btn" data-format="mp4">MP4</button>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <label for="folder-input" style="font-size: 0.85em; white-space: nowrap;">📁 Save to:</label>
+                        <input type="text" id="folder-input"
+                               placeholder="~/Downloads"
+                               style="padding: 6px 10px; border: 2px solid #444; border-radius: 8px; background: #1a1a2e; color: #fff; font-size: 0.85em; width: 220px;">
                     </div>
                     <button id="new-playlist-btn" class="btn-ghost">New Playlist</button>
                     <button id="select-all-btn" class="btn-secondary">Deselect All</button>

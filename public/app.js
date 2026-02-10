@@ -6,6 +6,8 @@ let errorIds = new Set();
 let allSelected = true;
 let selectedFormat = "mp3";
 let isDownloading = false;
+let playlistTitle = "";
+let downloadDir = ""; // folder path for saving files
 
 // === DOM Refs ===
 const urlInput = document.getElementById("url-input");
@@ -81,6 +83,7 @@ async function extractPlaylist() {
     errorIds = new Set();
     allSelected = true;
 
+    playlistTitle = data.title;
     playlistTitleEl.textContent = data.title;
     videoCountEl.textContent = `${videos.length} video${videos.length !== 1 ? "s" : ""}`;
 
@@ -186,6 +189,17 @@ newPlaylistBtn.addEventListener("click", () => {
   showSection("input");
 });
 
+// === Folder Input ===
+const folderInput = document.getElementById("folder-input");
+
+// Load saved folder from localStorage
+const savedFolder = localStorage.getItem("download_folder");
+if (savedFolder) folderInput.value = savedFolder;
+
+folderInput.addEventListener("input", () => {
+  localStorage.setItem("download_folder", folderInput.value.trim());
+});
+
 // === Format Toggle ===
 document.querySelectorAll(".format-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -225,14 +239,20 @@ async function startDownloads(videoIds) {
     downloadStatus.textContent = `Downloading: ${truncate(video.title, 40)}`;
 
     try {
+      const filename = buildFilename(video, selectedFormat);
+      downloadDir = folderInput.value.trim();
+
+      const reqBody = {
+        url: video.url,
+        fmt: selectedFormat,
+        title: filename.replace(/\.[^.]+$/, ""),
+      };
+      if (downloadDir) reqBody.save_dir = downloadDir;
+
       const res = await fetch("/api/download", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url: video.url,
-          fmt: selectedFormat,
-          title: video.title,
-        }),
+        body: JSON.stringify(reqBody),
       });
 
       if (!res.ok) {
@@ -244,24 +264,17 @@ async function startDownloads(videoIds) {
         throw new Error(detail);
       }
 
-      const blob = await res.blob();
-
-      // Get filename from Content-Disposition header
-      const cd = res.headers.get("Content-Disposition");
-      let filename = `${video.title}.${selectedFormat}`;
-      if (cd) {
-        const match = cd.match(/filename="(.+)"/);
-        if (match) filename = match[1];
+      // If no folder set, trigger browser download
+      if (!downloadDir) {
+        const blob = await res.blob();
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
       }
-
-      // Trigger browser download
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(a.href);
 
       completedCount++;
       downloadedIds.add(videoId);
@@ -342,4 +355,25 @@ function escapeAttr(text) {
 function truncate(str, maxLen) {
   if (!str) return "";
   return str.length > maxLen ? str.slice(0, maxLen) + "..." : str;
+}
+
+function buildFilename(video, format) {
+  const title = video.title || "video";
+  const artist = video.uploader || "";
+
+  // Check if title already contains the artist name
+  if (!artist || title.toLowerCase().includes(artist.toLowerCase())) {
+    return sanitizeFilename(`${title}.${format}`);
+  }
+
+  // Check if title already has "Artist - Title" pattern
+  if (title.includes(" - ")) {
+    return sanitizeFilename(`${title}.${format}`);
+  }
+
+  return sanitizeFilename(`${artist} - ${title}.${format}`);
+}
+
+function sanitizeFilename(name) {
+  return name.replace(/[<>:"/\\|?*]/g, "").replace(/\s+/g, " ").trim();
 }
